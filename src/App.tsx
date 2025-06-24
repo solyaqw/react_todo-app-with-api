@@ -1,6 +1,6 @@
 /* eslint-disable jsx-a11y/label-has-associated-control */
 /* eslint-disable jsx-a11y/control-has-associated-label */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import classNames from 'classnames';
 
 import { UserWarning } from './UserWarning';
@@ -27,15 +27,16 @@ export const App: React.FC = () => {
   const [todoValue, setTodoValue] = useState<string>('');
   const [isAdding, setIsAdding] = useState<boolean>(false);
 
-  const [deletingTodos, setDeletingTodos] = useState<number[]>([]);
-  const [updatingTodos, setUpdatingTodos] = useState<number[]>([]);
+  const [loadingTodoIds, setLoadingTodoIds] = useState<number[]>([]);
+
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const filteredTodos = todos.filter(todo => {
-    if (filter === 'active') {
+    if (filter === StatusFilter.Active) {
       return !todo.completed;
     }
 
-    if (filter === 'completed') {
+    if (filter === StatusFilter.Completed) {
       return todo.completed;
     }
 
@@ -47,7 +48,7 @@ export const App: React.FC = () => {
 
     const trimmedValue = todoValue.trim();
 
-    if (trimmedValue === '') {
+    if (!trimmedValue) {
       setError('Title should not be empty');
 
       return;
@@ -62,6 +63,8 @@ export const App: React.FC = () => {
       userId: USER_ID,
     });
 
+    setLoadingTodoIds(prev => [...prev, 0]);
+
     createTodo(trimmedValue)
       .then(newTodo => {
         setTodos([...todos, newTodo]);
@@ -73,18 +76,15 @@ export const App: React.FC = () => {
       .finally(() => {
         setTempTodo(null);
         setIsAdding(false);
+        setLoadingTodoIds(ids => ids.filter(id => id !== 0));
         setTimeout(() => {
-          (
-            document.querySelector(
-              '[data-cy="NewTodoField"]',
-            ) as HTMLInputElement
-          )?.focus();
+          inputRef.current?.focus();
         }, 0);
       });
   };
 
   const handleDelete = (todoId: number, onSuccess?: () => void) => {
-    setDeletingTodos([...deletingTodos, todoId]);
+    setLoadingTodoIds([...loadingTodoIds, todoId]);
 
     deleteTodo(todoId)
       .then(() => {
@@ -95,10 +95,10 @@ export const App: React.FC = () => {
         setError('Unable to delete a todo');
       })
       .finally(() => {
-        setDeletingTodos(deletingTodos.filter(id => id !== todoId));
-        (
-          document.querySelector('[data-cy="NewTodoField"]') as HTMLInputElement
-        )?.focus();
+        setLoadingTodoIds(loadingTodoIds.filter(id => id !== todoId));
+        setTimeout(() => {
+          inputRef.current?.focus();
+        }, 0);
       });
   };
 
@@ -107,7 +107,7 @@ export const App: React.FC = () => {
     let completedCount = completedTodos.length;
 
     completedTodos.forEach(todo => {
-      setDeletingTodos(prev => [...prev, todo.id]);
+      setLoadingTodoIds([...loadingTodoIds, todo.id]);
 
       deleteTodo(todo.id)
         .then(() => {
@@ -117,15 +117,13 @@ export const App: React.FC = () => {
           setError('Unable to delete a todo');
         })
         .finally(() => {
-          setDeletingTodos(prev => prev.filter(id => id !== todo.id));
+          setLoadingTodoIds(loadingTodoIds.filter(id => id !== todo.id));
           completedCount--;
 
           if (completedCount === 0) {
-            (
-              document.querySelector(
-                '[data-cy="NewTodoField"]',
-              ) as HTMLInputElement
-            )?.focus();
+            setTimeout(() => {
+              inputRef.current?.focus();
+            }, 0);
           }
         });
     });
@@ -138,7 +136,7 @@ export const App: React.FC = () => {
       return;
     }
 
-    setUpdatingTodos([...updatingTodos, todoId]);
+    setLoadingTodoIds([...loadingTodoIds, todoId]);
 
     updateTodo(todoId, { completed: !todoToUpdate.completed })
       .then(updatedTodo => {
@@ -150,7 +148,7 @@ export const App: React.FC = () => {
         setError('Unable to update a todo');
       })
       .finally(() => {
-        setUpdatingTodos(updatingTodos.filter(id => id !== todoId));
+        setLoadingTodoIds(loadingTodoIds.filter(id => id !== todoId));
       });
   };
 
@@ -171,7 +169,7 @@ export const App: React.FC = () => {
   const handleUpdate = (
     todoId: number,
     newTitle: string,
-    onSuccess?: () => void,
+    onSuccess: () => void = () => {},
   ) => {
     const todoToUpdate = todos.find(todo => todo.id === todoId);
 
@@ -179,20 +177,20 @@ export const App: React.FC = () => {
       return;
     }
 
-    setUpdatingTodos([...updatingTodos, todoId]);
+    setLoadingTodoIds([...loadingTodoIds, todoId]);
 
     updateTodo(todoId, { title: newTitle })
       .then(updatedTodo => {
         setTodos(toDos =>
           toDos.map(todo => (todo.id === todoId ? updatedTodo : todo)),
         );
-        onSuccess?.();
+        onSuccess();
       })
       .catch(() => {
         setError('Unable to update a todo');
       })
       .finally(() => {
-        setUpdatingTodos(updatingTodos.filter(id => id !== todoId));
+        setLoadingTodoIds(ids => ids.filter(id => id !== todoId));
       });
   };
 
@@ -232,6 +230,7 @@ export const App: React.FC = () => {
           allCompleted={todos.length > 0 && todos.every(todo => todo.completed)}
           handleToggleAll={handleToggleAll}
           shouldShowToggleAll={todos.length > 0}
+          inputRef={inputRef}
         />
 
         {loading && (
@@ -242,24 +241,11 @@ export const App: React.FC = () => {
 
         {!loading && shouldShowMain && (
           <TodoList
-            todos={filteredTodos}
-            deletingTodos={deletingTodos}
-            updatingTodos={updatingTodos}
+            todos={[...filteredTodos, ...(tempTodo ? [tempTodo] : [])]}
+            loadingTodoIds={loadingTodoIds}
             onDelete={handleDelete}
             onToggle={handleToggle}
             onUpdate={handleUpdate}
-          />
-        )}
-
-        {!loading && tempTodo && (
-          <TodoList
-            todos={[tempTodo]}
-            deletingTodos={[0]}
-            updatingTodos={[0]}
-            onDelete={() => {}}
-            onToggle={() => {}}
-            onUpdate={() => {}}
-            isTemp
           />
         )}
 

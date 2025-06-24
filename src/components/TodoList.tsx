@@ -4,8 +4,7 @@ import { Todo } from '../types/Todo';
 
 type Props = {
   todos: Todo[];
-  deletingTodos: number[];
-  updatingTodos: number[];
+  loadingTodoIds: number[];
   onDelete: (todoId: number, onSuccess?: () => void) => void;
   onToggle: (todoId: number) => void;
   isTemp?: boolean;
@@ -14,8 +13,7 @@ type Props = {
 
 export const TodoList: React.FC<Props> = ({
   todos,
-  deletingTodos,
-  updatingTodos,
+  loadingTodoIds,
   onDelete,
   onToggle,
   onUpdate,
@@ -32,19 +30,18 @@ export const TodoList: React.FC<Props> = ({
   return (
     <section className="todoapp__main" data-cy="TodoList">
       {todos.map(todo => {
-        const isDeleting = deletingTodos.includes(todo.id);
-        const isUpdating = updatingTodos.includes(todo.id);
+        const isLoading = loadingTodoIds.includes(todo.id);
 
         const handleSave = () => {
           const trimmedValue = editingValue.trim();
 
-          if (trimmedValue === todo.title) {
+          if (trimmedValue === todo.title.trim()) {
             setEditingId(null);
 
             return;
           }
 
-          if (trimmedValue === '') {
+          if (!trimmedValue) {
             onDelete(todo.id, () => setEditingId(null));
 
             return;
@@ -73,7 +70,7 @@ export const TodoList: React.FC<Props> = ({
             data-cy="Todo"
             className={classNames('todo', {
               completed: todo.completed,
-              deleting: isDeleting,
+              deleting: isLoading,
             })}
           >
             {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
@@ -123,7 +120,7 @@ export const TodoList: React.FC<Props> = ({
             <div
               data-cy="TodoLoader"
               className={classNames('modal overlay', {
-                'is-active': isDeleting || isUpdating,
+                'is-active': isLoading,
               })}
             >
               <div className="modal-background has-background-white-ter" />

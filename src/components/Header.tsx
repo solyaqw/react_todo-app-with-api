@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { RefObject } from 'react';
 import classNames from 'classnames';
 
 type Props = {
@@ -9,6 +9,7 @@ type Props = {
   allCompleted: boolean;
   handleToggleAll: () => void;
   shouldShowToggleAll: boolean;
+  inputRef: RefObject<HTMLInputElement>;
 };
 
 export const Header: React.FC<Props> = ({
@@ -19,6 +20,7 @@ export const Header: React.FC<Props> = ({
   allCompleted,
   handleToggleAll,
   shouldShowToggleAll,
+  inputRef,
 }) => (
   <header className="todoapp__header">
     {shouldShowToggleAll && (
@@ -42,6 +44,7 @@ export const Header: React.FC<Props> = ({
         value={todoValue}
         autoFocus
         disabled={isAdding}
+        ref={inputRef}
       />
     </form>
   </header>
